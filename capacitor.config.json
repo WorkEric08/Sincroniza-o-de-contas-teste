@@ -1,0 +1,12 @@
+{
+  "appId": "com.ericfernando.tarefassincronizadas",
+  "appName": "Tarefas Sincronizadas",
+  "webDir": "www",
+  "backgroundColor": "#f5f5f7",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

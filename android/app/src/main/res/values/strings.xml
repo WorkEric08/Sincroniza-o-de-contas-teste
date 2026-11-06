@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tarefas Sincronizadas</string>
+    <string name="title_activity_main">Tarefas Sincronizadas</string>
+    <string name="package_name">com.ericfernando.tarefassincronizadas</string>
+    <string name="custom_url_scheme">com.ericfernando.tarefassincronizadas</string>
+</resources>
