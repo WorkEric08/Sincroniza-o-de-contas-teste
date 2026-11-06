@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarefas sincronizadas</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 16px; background: #f5f5f7; color: #222; }
+  h1 { font-size: 1.3rem; }
+  button { padding: 10px 14px; border: 0; border-radius: 8px; background: #4285f4; color: #fff; font-size: 1rem; cursor: pointer; }
+  input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+  #form { display: flex; gap: 8px; margin: 12px 0; }
+  ul { list-style: none; padding: 0; }
+  li { display: flex; align-items: center; gap: 10px; background: #fff; padding: 10px; margin-bottom: 8px; border-radius: 8px; }
+  li span { flex: 1; }
+  li.feita span { text-decoration: line-through; color: #888; }
+  .del { background: #e5484d; padding: 6px 10px; }
+  #status { font-size: .85rem; color: #666; }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Tarefas sincronizadas</h1>
+
+<!-- Tela de login -->
+<div id="telaLogin">
+  <p>Entre com sua conta Google para ver suas tarefas em qualquer aparelho.</p>
+  <button id="btnLogin">Entrar com Google</button>
+</div>
+
+<!-- Tela do app -->
+<div id="telaApp" class="oculto">
+  <p id="status"></p>
+  <button id="btnSair" style="background:#888">Sair</button>
+
+  <form id="form">
+    <input id="texto" placeholder="Nova tarefa..." required>
+    <button>Adicionar</button>
+  </form>
+
+  <ul id="lista"></ul>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { initializeFirestore, persistentLocalCache, collection, addDoc, doc,
+           updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // 1) COLE AQUI a config do seu projeto (Firebase Console > Configurações > Seus apps > Web)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZV68LSu_SJr59Mmd1mw1V2B4Voqmh4Uk",
+    authDomain: "lista-de-tarefas-sincronizadas.firebaseapp.com",
+    projectId: "lista-de-tarefas-sincronizadas",
+    storageBucket: "lista-de-tarefas-sincronizadas.firebasestorage.app",
+    messagingSenderId: "1089405162048",
+    appId: "1:1089405162048:web:08911aa29e40793af385a5"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // 2) Banco com cache local = funciona offline e sincroniza quando a internet volta
+  const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+
+  const $ = id => document.getElementById(id);
+  let pararDeEscutar = null;
+
+  // 3) Login / logout
+  $("btnLogin").onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+  $("btnSair").onclick  = () => signOut(auth);
+
+  // 4) Reage ao login: mostra o app e começa a "escutar" o banco
+  onAuthStateChanged(auth, user => {
+    if (pararDeEscutar) { pararDeEscutar(); pararDeEscutar = null; }
+
+    $("telaLogin").classList.toggle("oculto", !!user);
+    $("telaApp").classList.toggle("oculto", !user);
+    if (!user) return;
+
+    $("status").textContent = "Conectado como " + user.email;
+
+    // Cada usuário só mexe na própria pasta: users/{uid}/tarefas
+    const tarefas = collection(db, "users", user.uid, "tarefas");
+
+    // 5) Escuta em tempo real: qualquer mudança (neste ou em outro aparelho) chega aqui
+    pararDeEscutar = onSnapshot(query(tarefas, orderBy("criadaEm")), snap => {
+      $("lista").innerHTML = "";
+      snap.forEach(d => {
+        const t = d.data();
+        const li = document.createElement("li");
+        li.className = t.feita ? "feita" : "";
+        li.innerHTML = `<input type="checkbox" ${t.feita ? "checked" : ""}>
+                        <span></span><button class="del">X</button>`;
+        li.querySelector("span").textContent = t.texto;
+        li.querySelector("input").onchange = e =>
+          updateDoc(doc(tarefas, d.id), { feita: e.target.checked });
+        li.querySelector(".del").onclick = () => deleteDoc(doc(tarefas, d.id));
+        $("lista").appendChild(li);
+      });
+    });
+
+    // 6) Adicionar = só gravar. Sem botão "salvar backup"
+    $("form").onsubmit = async e => {
+      e.preventDefault();
+      const texto = $("texto").value.trim();
+      if (!texto) return;
+      $("texto").value = "";
+      await addDoc(tarefas, { texto, feita: false, criadaEm: serverTimestamp() });
+    };
+  });
+</script>
+</body>
+</html>
